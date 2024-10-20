@@ -1,0 +1,96 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Holding = false
+
+_G.AimbotEnabled = true
+_G.TeamCheck = false
+_G.AimPart = "HumanoidRootPart"
+_G.CircleRadius = 80
+_G.CircleColor = Color3.fromRGB(255, 255, 255)
+_G.CircleTransparency = 0.7
+_G.CircleFilled = false
+_G.CircleVisible = true
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+FOVCircle.Radius = _G.CircleRadius
+FOVCircle.Filled = _G.CircleFilled
+FOVCircle.Color = _G.CircleColor
+FOVCircle.Visible = _G.CircleVisible
+FOVCircle.Transparency = _G.CircleTransparency
+
+local function updateHighlight(player)
+	local character = player.Character
+	if character and not character:FindFirstChild("Highlight") then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "Highlight"
+		highlight.FillTransparency = 1
+		highlight.OutlineColor = Color3.new(0.5, 0, 1)
+		highlight.Parent = character
+	end
+end
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function()
+		updateHighlight(player)
+	end)
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+	updateHighlight(player)
+end
+
+local function GetClosestPlayer()
+	local target = nil
+	local maximumDistance = _G.CircleRadius
+
+	for _, v in next, Players:GetPlayers() do
+		if v ~= LocalPlayer then
+			if _G.TeamCheck == false or (LocalPlayer.Team ~= v.Team) then
+				if v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid").Health > 0 then
+					local screenPoint = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+					local distance = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(screenPoint.X, screenPoint.Y)).Magnitude
+
+					if distance < maximumDistance then
+						target = v
+					end
+				end
+			end
+		end
+	end
+	return target
+end
+
+UserInputService.InputBegan:Connect(function(Input)
+	if Input.UserInputType == Enum.UserInputType.MouseButton2 then
+		Holding = true
+	elseif Input.KeyCode == Enum.KeyCode.T then
+		_G.AimbotEnabled = not _G.AimbotEnabled
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(Input)
+	if Input.UserInputType == Enum.UserInputType.MouseButton2 then
+		Holding = false
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	FOVCircle.Position = Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y)
+	FOVCircle.Radius = _G.CircleRadius
+	FOVCircle.Filled = _G.CircleFilled
+	FOVCircle.Color = _G.CircleColor
+	FOVCircle.Visible = _G.CircleVisible
+	FOVCircle.Transparency = _G.CircleTransparency
+
+	if Holding and _G.AimbotEnabled then
+		local targetPlayer = GetClosestPlayer()
+		if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			TweenService:Create(Camera, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {CFrame = CFrame.new(Camera.CFrame.Position, targetPlayer.Character.HumanoidRootPart.Position)}):Play()
+		end
+	end
+end)
